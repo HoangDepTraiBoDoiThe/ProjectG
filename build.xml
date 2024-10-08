@@ -1,0 +1,13 @@
+﻿<?xml version='1.0' ?>
+<BuildGraph xmlns="http://www.epicgames.com/BuildGraph" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.epicgames.com/BuildGraph ../Schema.xsd" >
+    <!-- Define the project path as a property -->
+    <Property Name="ProjectPath" Value="E:\Unreal Projects\ProjectG\ProjectG.uproject"/>
+
+    <Agent Name="first agent" Type="Win64">
+        <Node Name="Build_Client">
+            <!-- Reference the project path property in the Compile task -->
+            <Compile Target="ProjectG" Platform="Win64" Configuration="Development" Project="$(ProjectPath)" Tag="#Client_Build_Tag"/>
+            <Log Message="Starting to build ProjectG client" Files="#Client_Build_Tag"/>
+        </Node>
+    </Agent>
+</BuildGraph>
