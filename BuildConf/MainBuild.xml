@@ -1,0 +1,160 @@
+﻿<?xml version='1.0' ?>
+<BuildGraph xmlns="http://www.epicgames.com/BuildGraph" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.epicgames.com/BuildGraph ../Schema.xsd" >
+    <Option Name="ProjectRootDir" Description="Project directory" DefaultValue=""/>
+    <Option Name="ProjectName" Description="Project name" DefaultValue=""/>
+    <Option Name="ExtraToolCompileArguments" Description="ExtraToolCompileArguments" DefaultValue=""/>
+    <Property Name="ProjectPath" Value="$(ProjectRootDir)\$(ProjectName).uproject"/>
+
+    <Option Name="AgentPrefixCompile" DefaultValue="Compile" Description="The prefix to use when defining agents that use compile type nodes." />
+
+    <Option Name="EditorPlatform" Description="Server's target platform. Default: Win64" DefaultValue="Win64"/>
+    <Option Name="ServerPlatform" Description="Server's target platform. Should be Linux" DefaultValue="Linux"/>
+    <Option Name="ClientPlatforms" Description="Client's target platform" DefaultValue="Win64"/>
+
+    <Option Name="Configuration" Description="Like shipping, Debugging or Development. Default: Development" DefaultValue="Development"/>
+
+    <Option Name="AgentHasEngineSourceCode" DefaultValue="EngineSourceCode" Description="Default: EngineSourceCode" />
+    <Option Name="AgentHasEngineBinary" DefaultValue="EngineBinary" Description="Default: EngineBinary" />
+    <Property Name="ToolsNodeName" Value="Compile Tools" />
+    <Property Name="EditorNodeName" Value="Compile Editor" />
+    <Property Name="EditorTestNodeName" Value="Run Tests" />
+    <Property Name="ToolChainNodeName" Value="Editor tool chains" />
+    
+    <Property Name="BuildNodes" Value="" />
+
+    <!--Editor and tools-->
+    <Property Name="CompilerAgent" Value="$(AgentHasEngineSourceCode)" />
+    <Agent Name="Agent build tools for $(EditorPlatform)" Type="$(CompilerAgent)">
+        <Node Name="Compile Tools for $(EditorPlatform)" Produces="#$(EditorPlatform)ToolBinaries">
+            <Compile Target="CrashReportClient" Platform="$(EditorPlatform)" Configuration="Shipping" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries"/>
+            <Compile Target="CrashReportClientEditor" Platform="$(EditorPlatform)" Configuration="Shipping" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries"/>
+            <!--
+                            <Compile Target="ShaderCompileWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries"/>
+            -->
+            <Compile Target="UnrealLightmass" Platform="$(EditorPlatform)" Configuration="Development" Tag="#$(EditorPlatform)ToolBinaries"/>
+            <Compile Target="InterchangeWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries"/>
+            <Compile Target="UnrealPak" Platform="$(EditorPlatform)" Configuration="Development" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries"/>
+            <Compile Target="BootstrapPackagedGame" Platform="$(EditorPlatform)" Configuration="Shipping" Arguments="$(ExtraToolCompileArguments)" Tag="#$(EditorPlatform)ToolBinaries" If="'$(EditorPlatform)' == 'Win64'"/>
+        </Node>
+
+        <Node Name="Compile source code editor for $(EditorPlatform)" Requires="Compile Tools for $(EditorPlatform)" Produces="#$(EditorPlatform)SourceCodeEditorBinaries">
+            <Compile Target="$(ProjectName)Editor" Project="$(ProjectPath)" Platform="$(EditorPlatform)" Configuration="Development" Arguments="" Tag="#$(EditorPlatform)SourceCodeEditorBinaries"/>
+        </Node>
+
+        <Node Name="Run engine binary Tests $(EditorPlatform)" Requires="Compile source code editor for $(EditorPlatform)">
+            <Property Name="TestArgs" Value="-Project=$(ProjectPath) -NullRHI -Deterministic" />
+            <Property Name="TestArgs" Value="$(TestArgs) -Test=UE.EditorAutomation -RunTest=&quot;StartsWith:Input&quot;" />
+            <Property Name="TestArgs" Value="$(TestArgs) -Build=Editor -UseEditor" />
+            <Command Name="RunUnreal" Arguments="$(TestArgs)" />
+        </Node>
+    </Agent>
+
+    <Property Name="CompilerAgent" Value="$(AgentHasEngineBinary)" />
+    <Agent Name="Agent compile editor for cooking" Type="$(CompilerAgent)">
+        <Node Name="Compile binary editor for $(EditorPlatform)" Produces="#$(EditorPlatform)BinaryEditorBinaries">
+            <Compile Target="$(ProjectName)Editor" Project="$(ProjectPath)" Platform="$(EditorPlatform)" Configuration="Development" Arguments="" Tag="#$(EditorPlatform)BinaryEditorBinaries"/>
+        </Node>
+
+        <Node Name="Run engine source code Tests $(EditorPlatform)" Requires="Compile binary editor for $(EditorPlatform)">
+            <Property Name="TestArgs" Value="-Project=$(ProjectPath) -NullRHI -Deterministic" />
+            <Property Name="TestArgs" Value="$(TestArgs) -Test=UE.EditorAutomation -RunTest=&quot;StartsWith:Input&quot;" />
+            <Property Name="TestArgs" Value="$(TestArgs) -Build=Editor -UseEditor" />
+            <Command Name="RunUnreal" Arguments="$(TestArgs)" />
+        </Node>
+    </Agent>
+    <Property Name="BuildNodes" Value="$(BuildNodes);Compile source code editor for $(EditorPlatform);Compile binary editor for $(EditorPlatform);Run engine binary Tests $(EditorPlatform);Run engine source code Tests $(EditorPlatform);Compile binary editor for $(EditorPlatform);Compile source code editor for $(EditorPlatform);" />
+
+    <!--Server-->
+    <Property Name="CompilerAgent" Value="$(AgentHasEngineSourceCode)" />
+    <Property Name="CompileServer" Value="Compile $(ServerPlatform) $(Configuration) server" />
+    <Agent Name="$(CompileServer)" Type="$(CompilerAgent)">
+        <Node Name="$(CompileServer)" Requires="Compile Tools for $(EditorPlatform)">
+            <Compile Target="$(ProjectName)Server" Configuration="$(Configuration)" Platform="$(ServerPlatform)" Project="$(ProjectPath)" Arguments=""/>
+        </Node>
+
+        <Property Name="BuildNodes" Value="$(BuildNodes);$(CompileServer);" />
+    </Agent>
+
+    <!--Cooking-->
+    <Property Name="CookerAgent" Value="$(AgentHasEngineBinary)" />
+    <Agent Name="Cook $(ServerPlatform) server" Type="$(CookerAgent)">
+        <Node Name="Cook $(ServerPlatform) server" Requires="Compile source code editor for $(EditorPlatform)">
+            <Cook Platform="$(ServerPlatform)Server" Project="$(ProjectPath)" />
+        </Node>
+
+        <Property Name="BuildNodes" Value="$(BuildNodes);Cook $(ServerPlatform) server;" />
+    </Agent>
+
+    <!--Packaging-->
+    <Property Name="PackagerAgent" Value="$(AgentHasEngineSourceCode)" />
+    <Agent Name="Package $(ServerPlatform) server" Type="$(PackagerAgent)">
+        <Node Name="Stage $(ServerPlatform) server" Requires="Cook $(ServerPlatform) server;$(CompileServer)">
+            <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(ServerPlatform) -Project=$(ProjectPath) -Server -NoClient -SkipBuild -SkipCook -NoCodeSign -Stage -Pak" />
+        </Node>
+
+        <Node Name="Package $(ServerPlatform) server" Requires="Stage $(ServerPlatform) server">
+            <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(ServerPlatform) -Project=$(ProjectPath) -Server -NoClient -SkipBuild -SkipCook -NoCodeSign -SkipStage -Package" />
+        </Node>
+
+        <Node Name="Archive $(ServerPlatform) server" Requires="Package $(ServerPlatform) server">
+            <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(ServerPlatform) -Project=$(ProjectPath) -Server -NoClient -SkipBuild -SkipCook -NoCodeSign -SkipStage -SkipPak -SkipPackage -Archive" />
+        </Node>
+
+        <Node Name="Publish $(ServerPlatform) Server" Requires="Archive $(ServerPlatform) server">
+            <Property Name="PublishPlatform" Value="$(ServerPlatform)" />
+            <Property Name="PublishPlatform" Value="Windows" If="'$(ServerPlatform)' == 'Win64'" />
+            <Log Message="##teamcity[publishArtifacts 'game/ArchivedBuilds/$(PublishPlatform)Server=>$(PublishPlatform)Server.zip']" />
+        </Node>
+
+        <Property Name="BuildNodes" Value="$(BuildNodes);Stage $(ServerPlatform) server;Package $(ServerPlatform) server;Archive $(ServerPlatform) server;Publish $(ServerPlatform) Server" />
+    </Agent>
+
+    <!--Client-->
+    <ForEach Name="Platform" Values="$(ClientPlatforms)">
+        <Property Name="AgentCompiler" Value="$(AgentHasEngineSourceCode)" />
+        <Property Name="CompileClient" Value="Compile $(Platform) $(Configuration) Client" />
+        <Agent Name="Agent $(CompileClient)" Type="$(AgentCompiler)">
+            <Node Name="$(CompileClient)" Requires="Compile binary editor for $(EditorPlatform)">
+                <Compile Target="$(ProjectName)Client" Configuration="$(Configuration)" Platform="$(Platform)" Project="$(ProjectPath)" Arguments=""/>
+            </Node>
+        </Agent>
+
+        <Property Name="BuildNodes" Value="$(BuildNodes);$(CompileClient);" />
+
+        <!--Cooking-->
+        <Property Name="CookerAgent" Value="$(AgentHasEngineBinary)" />
+        <Agent Name="Cook $(Platform) Client" Type="$(CookerAgent)">
+            <Node Name="Cook $(Platform) Client" Requires="Compile binary editor for $(EditorPlatform)">
+                <Cook Platform="WindowsClient" Project="$(ProjectPath)" />
+            </Node>
+
+            <Property Name="BuildNodes" Value="$(BuildNodes);Cook $(Platform) Client;" />
+        </Agent>
+        
+        <!--Packaging-->
+        <Property Name="PackagerAgent" Value="$(AgentHasEngineBinary)" />
+        <Agent Name="Agent Package $(Platform) Client" Type="$(PackagerAgent)">
+            <Node Name="Stage $(Platform) Client" Requires="$(CompileClient);Cook $(Platform) Client">
+                <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(Platform) -Project=$(ProjectPath) -Client -SkipBuild -SkipCook -NoCodeSign -Stage -Pak" />
+            </Node>
+
+            <Node Name="Package $(Platform) Client" Requires="Stage $(Platform) Client">
+                <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(Platform) -Project=$(ProjectPath) -Client -SkipBuild -SkipCook -NoCodeSign -SkipStage -Package" />
+            </Node>
+
+            <Node Name="Archive $(Platform) Client" Requires="Package $(Platform) Client">
+                <Command Name="BuildCookRun" Arguments="-Configuration=$(Configuration) -Platform=$(Platform) -Project=$(ProjectPath) -Client -SkipBuild -SkipCook -NoCodeSign -SkipStage -SkipPak -SkipPackage -Archive" />
+            </Node>
+
+            <Node Name="Publish $(Platform) Client" Requires="Archive $(Platform) Client">
+                <Property Name="PublishPlatform" Value="$(Platform)" />
+                <Property Name="PublishPlatform" Value="Windows" If="'$(Platform)' == 'Win64'" />
+                <Log Message="##teamcity[publishArtifacts 'game/ArchivedBuilds/$(PublishPlatform)Client=>$(PublishPlatform)Client.zip']" />
+            </Node>
+        </Agent>
+
+        <Property Name="BuildNodes" Value="$(BuildNodes);Stage $(Platform) Client;Package $(Platform) Client;Archive $(Platform) Client;Publish $(Platform) Client" />
+    </ForEach>
+
+    <Aggregate Name="BuildProject" Requires="$(BuildNodes)" />
+</BuildGraph>
