@@ -75,3 +75,7 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 .vsconfig
+
+Content/Assets/Characters/Maximo/
+
+Content/Assets/Characters/Retarget/
