@@ -4,9 +4,6 @@
 #include "GameFramework/Character.h"
 #include "BaseCharacter.generated.h"
 
-class USpringArmComponent;
-class UCameraComponent;
-
 UCLASS()
 class PROJECTG_API ABaseCharacter : public ACharacter
 {
@@ -19,9 +16,4 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
-	TObjectPtr<USpringArmComponent> SpringArmComponent;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
-	TObjectPtr<UCameraComponent> CameraComponent;
 };
